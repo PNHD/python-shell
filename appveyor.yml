@@ -16,6 +16,9 @@ environment:
     - nodejs_version: '20'
       PYTHON: "C:\\Python312-x64"
 
+    - nodejs_version: '22'
+      PYTHON: "C:\\Python312-x64"
+
 install:
   - cmd: powershell Install-Product node $env:nodejs_version
   - sh: nvm install $nodejs_version
