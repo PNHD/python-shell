@@ -5,9 +5,9 @@ from pathlib import Path
 import numpy as np,pandas as pd,requests
 from numba import njit
 FEE=.0005; CAP=100.; YEARS=(1,2,3,4,5)
-GRIDS=np.array([3,4,5,6,8,10,12,15,20,25,30,40,50,70,100,150,200,300,500,700,1000],np.int64)
-LOWS=np.array([.10,.20,.25,.35,.45,.55,.65,.75,.85,.90,.95])
-UPS=np.array([1.05,1.10,1.25,1.50,1.75,2.,2.5,3.,4.,5.,7.,10.])
+GRIDS=np.array([2,3,4,5,6,8,10,12,15,20,25,30,40,50,70,100,150,200,300,500,700,1000],np.int64)
+LOWS=np.array([.01,.02,.05,.10,.20,.25,.35,.45,.55,.65,.75,.85,.90,.95,.98])
+UPS=np.array([1.02,1.05,1.10,1.25,1.50,1.75,2.,2.5,3.,4.,5.,7.,10.,15.,20.,30.,50.])
 UA={'User-Agent':'grid-research/1.0'}
 
 def url(sym,intv,y,m,d=None):
@@ -53,7 +53,7 @@ def load(sym):
 
 @njit(cache=True)
 def sim(o,h,l,c,lo,up,n,kind):
-    if len(o)<2 or n<3 or lo<=0 or up<=lo:return (np.nan,np.nan,np.nan,0,np.nan,0,0,0)
+    if len(o)<2 or n<2 or lo<=0 or up<=lo:return (np.nan,np.nan,np.nan,0,np.nan,0,0,0)
     lv=np.empty(n,np.float64)
     if kind==0:
         s=math.log(up/lo)/(n-1)
