@@ -1,0 +1,65 @@
+name: TEMP Grid Winner 1m Validation
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'grid_research/validate_1m.py'
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        symbol: [ZECUSDT, NEARUSDT, SUIUSDT, HBARUSDT, SHIBUSDT, SOLUSDT]
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install numpy pandas requests numba
+      - run: python grid_research/validate_1m.py ${{ matrix.symbol }}
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-${{ matrix.symbol }}
+          path: validation/${{ matrix.symbol }}.csv
+          if-no-files-found: warn
+          retention-days: 7
+
+  aggregate:
+    needs: validate
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: validation-*
+          path: downloaded
+          merge-multiple: true
+      - run: |
+          python - <<'PY'
+          import csv,glob
+          fs=glob.glob('downloaded/*.csv'); rows=[]; fields=None
+          for f in fs:
+              with open(f,newline='') as h:
+                  rr=list(csv.DictReader(h))
+                  if rr:
+                      fields=rr[0].keys(); rows.extend(rr)
+          with open('grid_winner_validation_1m.csv','w',newline='') as h:
+              if fields:
+                  w=csv.DictWriter(h,fieldnames=fields);w.writeheader();w.writerows(rows)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: grid-winner-validation-1m
+          path: grid_winner_validation_1m.csv
+          retention-days: 7
