@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [master]
     paths:
-      - 'grid_research/**'
+      - 'grid_research/grid_runner.py'
   workflow_dispatch:
 
 permissions:
@@ -75,10 +75,6 @@ jobs:
               robust=t.groupby('symbol',as_index=False).agg(windows=('years','count'),median_total=('total_pnl_pct','median'),mean_total=('total_pnl_pct','mean'),worst_total=('total_pnl_pct','min'),median_dd=('max_drawdown_pct','median')).merge(g.groupby('symbol',as_index=False).agg(median_grid=('grid_profit_pct','median'),mean_grid=('grid_profit_pct','mean'),worst_grid=('grid_profit_pct','min')),on='symbol',how='outer')
               robust['score']=robust.median_total+0.5*robust.median_grid-0.25*robust.median_dd
               robust.sort_values(['windows','score'],ascending=[False,False]).to_csv('grid_top20_robust.csv',index=False)
-              print('\nTOTAL WINNERS')
-              print(t.groupby('years',as_index=False).first()[['years','symbol','total_pnl_pct','grid_profit_pct','grid_type','grids','lower_mult','upper_mult','max_drawdown_pct']].to_string(index=False))
-              print('\nGRID PROFIT WINNERS')
-              print(g.groupby('years',as_index=False).first()[['years','symbol','grid_profit_pct','total_pnl_pct','grid_type','grids','lower_mult','upper_mult','max_drawdown_pct']].to_string(index=False))
           PY
       - name: Upload aggregate
         uses: actions/upload-artifact@v4
