@@ -5,7 +5,6 @@ from pathlib import Path
 import pandas as pd,numpy as np,requests
 from grid_runner import sim,FEE,CAP
 
-# H1 top-2 pure-grid candidates per horizon (v2), grouped by symbol.
 CONFIGS={
  'ZECUSDT':[(1,.01,15.,3,1),(2,.01,15.,3,1),(3,.01,30.,15,1),(4,.25,10.,3,1)],
  'NEARUSDT':[(1,.01,1.25,3,1),(3,.90,7.,2,0)],
@@ -58,17 +57,22 @@ def load(sym,years):
     return x[(x.ts>=pd.Timestamp(start))&(x.ts<=pd.Timestamp(end))].reset_index(drop=True)
 
 def main(sym):
-    cfgs=CONFIGS[sym];maxy=max(x[0] for x in cfgs);x=load(sym,maxy)
+    cfgs=CONFIGS[sym];maxy=max(v[0] for v in cfgs);x=load(sym,maxy)
     Path('validation').mkdir(exist_ok=True);rows=[]
     print('DATA1M',sym,len(x),x.ts.iloc[0] if len(x) else None,x.ts.iloc[-1] if len(x) else None,flush=True)
     if x.empty:pd.DataFrame().to_csv(f'validation/{sym}.csv',index=False);return
-    end=x.ts.iloc[-1]
+    # H1 archive is keyed by candle OPEN time. Match its final 23:00 candle by
+    # replaying all 1m candles from 23:00 through 23:59, and match the start
+    # at the exact same 23:00 open one/two/... years earlier.
+    anchor_end=x.ts.iloc[-1].floor('h')
+    end_exclusive=anchor_end+pd.Timedelta(hours=1)
     for years,lm,um,n,kind in cfgs:
-        target=end-pd.DateOffset(years=years);w=x[x.ts>=target].reset_index(drop=True)
-        if w.empty or w.ts.iloc[0]>target+pd.Timedelta(minutes=5):
-            print('NA',sym,years,flush=True);continue
+        target=anchor_end-pd.DateOffset(years=years)
+        w=x[(x.ts>=target)&(x.ts<end_exclusive)].reset_index(drop=True)
+        if w.empty or w.ts.iloc[0]!=target:
+            print('NA_OR_MISALIGNED',sym,years,target,w.ts.iloc[0] if len(w) else None,flush=True);continue
         a=w[['open','high','low','close']].to_numpy(np.float64);p0=float(a[0,0]);p1=float(a[-1,3]);r=sim(a[:,0],a[:,1],a[:,2],a[:,3],p0*lm,p0*um,int(n),int(kind))
-        row={'symbol':sym,'years':years,'start':str(w.ts.iloc[0]),'end':str(w.ts.iloc[-1]),'start_price':p0,'end_price':p1,'lower_mult':lm,'upper_mult':um,'grids':n,'grid_type':'geometric' if kind==0 else 'arithmetic','total_pnl_pct':(r[0]/CAP-1)*100,'final_equity':r[0],'grid_profit_pct':r[1]/CAP*100,'grid_profit_usd':r[1],'max_drawdown_pct':r[2],'fills':r[3],'fees_usd':r[4],'outside_low_pct':r[5],'outside_high_pct':r[6],'cycles':r[7],'buy_hold_pct':(p1/(p0*(1+FEE))-1)*100,'resolution':'1m'}
+        row={'symbol':sym,'years':years,'start':str(w.ts.iloc[0]),'end':str(w.ts.iloc[-1]),'start_price':p0,'end_price':p1,'lower_mult':lm,'upper_mult':um,'grids':n,'grid_type':'geometric' if kind==0 else 'arithmetic','total_pnl_pct':(r[0]/CAP-1)*100,'final_equity':r[0],'grid_profit_pct':r[1]/CAP*100,'grid_profit_usd':r[1],'max_drawdown_pct':r[2],'fills':r[3],'fees_usd':r[4],'outside_low_pct':r[5],'outside_high_pct':r[6],'cycles':r[7],'buy_hold_pct':(p1/(p0*(1+FEE))-1)*100,'resolution':'1m_aligned_to_h1_window'}
         rows.append(row);print('VALID',row,flush=True)
     pd.DataFrame(rows).to_csv(f'validation/{sym}.csv',index=False)
 if __name__=='__main__':main(sys.argv[1])
