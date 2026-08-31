@@ -1,0 +1,49 @@
+name: Verify PR 333
+
+on:
+  push:
+    branches:
+      - ops/verify-pr333
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 24]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out PR head
+        uses: actions/checkout@v4
+        with:
+          ref: fix/return-kill-result
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          node --version
+          python --version
+          npm ci
+          npm install --global nyc
+
+      - name: Run project test command
+        run: npm test
+
+      - name: Run AppVeyor-equivalent test command
+        run: npm run appveyorTest
+
+      - name: Check formatting of changed files
+        run: npx prettier --check index.ts test/test-python-shell.ts
