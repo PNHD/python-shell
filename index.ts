@@ -169,6 +169,7 @@ export class PythonShell extends EventEmitter {
 
     let self = this;
     let errorData = '';
+    let parserError: Error;
     EventEmitter.call(this);
 
     options = <Options>extend({}, PythonShell.defaultOptions, options);
@@ -205,7 +206,12 @@ export class PythonShell extends EventEmitter {
       // note that setting the encoding turns the chunk into a string
       stdoutSplitter.setEncoding(options.encoding || 'utf8');
       this.stdout.pipe(stdoutSplitter).on('data', (chunk: string) => {
-        this.emit('message', self.parser(chunk));
+        if (parserError) return;
+        try {
+          this.emit('message', self.parser(chunk));
+        } catch (err) {
+          parserError = err instanceof Error ? err : new Error(String(err));
+        }
       });
     }
 
@@ -215,7 +221,12 @@ export class PythonShell extends EventEmitter {
       // note that setting the encoding turns the chunk into a string
       stderrSplitter.setEncoding(options.encoding || 'utf8');
       this.stderr.pipe(stderrSplitter).on('data', (chunk: string) => {
-        this.emit('stderr', self.stderrParser(chunk));
+        if (parserError) return;
+        try {
+          this.emit('stderr', self.stderrParser(chunk));
+        } catch (err) {
+          parserError = err instanceof Error ? err : new Error(String(err));
+        }
       });
     }
 
@@ -258,7 +269,10 @@ export class PythonShell extends EventEmitter {
         return;
 
       let err: PythonShellError;
-      if (self.exitCode && self.exitCode !== 0) {
+      if (parserError) {
+        err = new PythonShellError(parserError.message);
+        err.stack = parserError.stack;
+      } else if (self.exitCode && self.exitCode !== 0) {
         if (errorData) {
           err = self.parseError(errorData);
         } else {
@@ -266,6 +280,9 @@ export class PythonShell extends EventEmitter {
             'process exited with code ' + self.exitCode,
           );
         }
+      }
+
+      if (err) {
         err = <PythonShellError>extend(err, {
           executable: pythonPath,
           options: pythonOptions.length ? pythonOptions : null,

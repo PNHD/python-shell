@@ -415,6 +415,18 @@ describe('PythonShell', function () {
         })
         .end(done);
     });
+    it('should report JSON parser errors through the end callback', function (done) {
+      let pyshell = new PythonShell('echo_text.py', {
+        mode: 'json',
+        formatter: 'text',
+      });
+      pyshell.send('not-json').end(function (err) {
+        should.exist(err);
+        err.should.be.an.Error;
+        err.message.should.match(/JSON|Unexpected token/);
+        done();
+      });
+    });
     it('should properly buffer partial messages', function (done) {
       // echo_text_with_newline_control echoes text with $'s replaced with newlines
       let pyshell = new PythonShell('echo_text_with_newline_control.py', {
