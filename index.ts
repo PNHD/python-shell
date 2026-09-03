@@ -207,11 +207,14 @@ export class PythonShell extends EventEmitter {
       stdoutSplitter.setEncoding(options.encoding || 'utf8');
       this.stdout.pipe(stdoutSplitter).on('data', (chunk: string) => {
         if (parserError) return;
+        let parsedChunk: any;
         try {
-          this.emit('message', self.parser(chunk));
+          parsedChunk = self.parser(chunk);
         } catch (err) {
           parserError = err instanceof Error ? err : new Error(String(err));
+          return;
         }
+        this.emit('message', parsedChunk);
       });
     }
 
@@ -222,11 +225,14 @@ export class PythonShell extends EventEmitter {
       stderrSplitter.setEncoding(options.encoding || 'utf8');
       this.stderr.pipe(stderrSplitter).on('data', (chunk: string) => {
         if (parserError) return;
+        let parsedChunk: any;
         try {
-          this.emit('stderr', self.stderrParser(chunk));
+          parsedChunk = self.stderrParser(chunk);
         } catch (err) {
           parserError = err instanceof Error ? err : new Error(String(err));
+          return;
         }
+        this.emit('stderr', parsedChunk);
       });
     }
 
@@ -269,10 +275,7 @@ export class PythonShell extends EventEmitter {
         return;
 
       let err: PythonShellError;
-      if (parserError) {
-        err = new PythonShellError(parserError.message);
-        err.stack = parserError.stack;
-      } else if (self.exitCode && self.exitCode !== 0) {
+      if (self.exitCode && self.exitCode !== 0) {
         if (errorData) {
           err = self.parseError(errorData);
         } else {
@@ -280,6 +283,9 @@ export class PythonShell extends EventEmitter {
             'process exited with code ' + self.exitCode,
           );
         }
+      } else if (parserError) {
+        err = new PythonShellError(parserError.message);
+        err.stack = parserError.stack;
       }
 
       if (err) {
